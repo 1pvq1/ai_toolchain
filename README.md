@@ -1,148 +1,70 @@
 # ai_toolchain
 
+A Python CLI for sharing one model warehouse across Stable Diffusion WebUI (A1111) and multiple ComfyUI installations. It can either replace each app's model folder with a directory symlink or keep the folder and add a nested `WLink`. The default is whole-folder replacement. Every command previews its work until `--apply` is supplied.
 
-AI Model Toolchain (remand description)
+## Layout
 
-A model warehouse and soft link tool chain for unified management of Stable Diffusion WebUI (A1111) and ComfyUI multi-version.
+```text
+config/                            Machine paths and explicit model mappings
+src/ai_toolchain/cli.py             CLI and dependency composition root
+src/ai_toolchain/config.py          YAML validation
+src/ai_toolchain/targets.py         Application mapping selection
+src/ai_toolchain/storage/           Plans, migration, consolidation, recovery, and ports
+src/ai_toolchain/storage/adapters/  Local filesystem, SHA-256, journals, process guard, progress
+tests/storage/                      Temporary-directory storage integration tests
+pyproject.toml                     Package and ai-toolchain entry point
+```
 
-The goal is to allow multiple applications and multiple versions to share the same set of model resources, so as to achieve higher storage utilization, a more stable production environment, and a more convenient development and testing process.
+Model files and recovery state stay outside this repository. `config/paths.yaml` names the warehouse, A1111 root, and ComfyUI versions. `config/mapping.yaml` maps paths relative to an application root to paths relative to the warehouse. Unmapped application folders are reported; the CLI does not infer a destination. A missing app folder or warehouse directory is reported and skipped.
 
----
+The checked-in paths match this machine: `D:/AIProj/Models/CV`, `D:/AIProj/launcher/stable-diffusion-webui`, and `D:/AIProj/launcher/ComfyUI_Portable/{v018,v037_cu126}/ComfyUI`. Use `--config-dir` with another pair of YAML files for a different installation.
 
-🎯 Project Objectives
+## Setup in aienv3
 
-- Model Warehouse
+```powershell
+conda activate aienv3
+python -m pip install -e .
+python -m pytest -q --basetemp=.pytest_cache/tmp
+```
 
-Store all model files in a standardized warehouse directory to avoid repeated disk space.
+The `--basetemp` argument keeps test fixtures in the repository's ignored pytest cache, which is useful when the normal Windows temporary directory is restricted.
 
-- Multi-application common model (A1111 / ComfyUI)
+## Commands
 
-Automatically create soft links for different applications, so that they point to the same repository and realize model sharing.
+```powershell
+ai-toolchain a1111                         # preview whole-folder links
+ai-toolchain comfyui --version v018         # preview one ComfyUI version
+ai-toolchain comfyui --mode nested          # preview WLink links
+ai-toolchain check all                      # read-only verification
+ai-toolchain migrations                     # list migration journals
+ai-toolchain consolidate                    # preview legacy backup consolidation
+ai-toolchain resume MIGRATION_ID            # preview resuming interrupted work
+ai-toolchain rollback MIGRATION_ID          # preview restoring folders
+```
 
-- Multi-version shared model (ComfyUI multi-version)
+Add `--apply` to a mutating command to make its previewed changes. Close affected applications before applying; the CLI checks for running Python processes in the selected installs. Use `--mode replace|nested` to override `link_mode` from `paths.yaml`. Omitting `--version` handles every configured ComfyUI version. `--config-dir`, `--state-dir`, and `--no-progress` are global options and go before the command.
 
-Support ComfyUI multiple versions (production / development / testing) to use the same warehouse at the same time to avoid duplicate downloads and maintenance.
+### Whole-folder migration
 
-- Automated configuration and verification
+The tool checks all selected mappings before making changes. It rejects unexpected symlinks and destination collisions with different content. If a relative filename already exists in the warehouse, SHA-256 establishes whether the files are identical. The original app folder is staged under `<warehouse>/.ai_toolchain/staging`, unique files are hardlinked into their mapped warehouse category, and digest-addressed snapshot hardlinks are created under `.ai_toolchain/objects`. After verification, the application folder becomes a directory symlink. No permanent backup directory remains beside the app. The versioned manifest records files, old `WLink` targets, and empty folders.
 
-Automatically create soft links, check the directory structure, and prompt missing or unmapped model directories.
+Versioned manifests, staging, legacy journal archives, and snapshots live in hidden `<warehouse>/.ai_toolchain` by default. `--state-dir PATH` selects another state location on the same volume. If an operation is interrupted, use `ai-toolchain migrations` and `ai-toolchain resume ID --apply`. A completed migration can be rolled back: after checking snapshot and warehouse hashes and available space, files are **copied** back to reconstruct the original app folder. Warehouse models and snapshot hardlinks remain available. An in-place edit of a hardlinked model also edits its snapshot; digest checks refuse rollback in that case.
 
-- Extensible Python tool chain
+Switching a whole-folder link to `--mode nested --apply` reconstructs all folders in its migration from snapshots, then creates or repairs `WLink` inside them. A real folder or unrelated link at that name is a conflict. A mode switch may require substantial free space because local files are copied back.
 
-In the future, it can be expanded to:
+### Legacy consolidation
 
-- workflow compatibility check
+`ai-toolchain consolidate` previews applied ComfyUI journals from the prior release. Use `--migration ID` to select one. It verifies every active link, recorded warehouse file, duplicate backup file, and unknown backup entry before writing. `--apply` creates and verifies snapshot hardlinks, moves adjacent backups into warehouse staging, removes verified redundant files, commits new manifests, and archives old journals. Existing application links stay in place. The two October 2026 ComfyUI migrations were consolidated; their adjacent backups held 10,774,052,856 redundant bytes.
 
-- automatic update of custom nodes
+On Windows, creating directory symlinks requires an account or Developer Mode with the necessary privilege. If creation fails, the journal retains the stage for `resume`. Hardlink snapshots require the state and warehouse models to be on the same volume.
 
-- Multi-version switching and marking
+## Development checks
 
-- Warehouse integrity scanning
+Run tests and lint with the `aienv3` interpreter:
 
-- Repeated detection of the model
+```powershell
+python -m pytest -q --basetemp=.pytest_cache/tmp
+python -m ruff check src tests
+```
 
----
-
-📦 Current function (minimum closed loop)
-
-1. Unified model warehouse management
-
-- Automatically read the warehouse path
-
-- Automatically identify the standardized model directory in the warehouse
-
-- Map the model directory of A1111 / ComfyUI to the warehouse directory
-
-2. A1111 Model Soft Link Creation
-
-- Automatically traverse the model directory of A1111
-
-- Create `WLink → Warehouse Directory` according to the mapping relationship
-
-- Automatically skip unmapped or non-existent directories
-
-- Automatically delete the empty directory and then create a soft link
-
-3. ComfyUI multi-version model soft link creation
-
-- Support multiple ComfyUI versions
-
-- Each version automatically traverses its `models/` subdirectory
-
-- Create `WLink → Warehouse Directory` according to the mapping relationship
-
-- Automatically skip unmapped or non-existent directories
-
-4. Unified CLI operation
-
-Provide a simple and consistent command line entrance:
-
-Ai-toolchain a1111
-
-Ai-toolchain comfyui
-
----
-
-🧩 Configuration method
-
-1. `paths.yaml`
-
-Define the warehouse path, A1111 path, and ComfyUI multi-version path.
-
-2. `mapping.yaml`
-
-Define the model directory mapping relationship, such as:
-
-- `Stable-diffusion → Checkpoints`
-
-- `loras → Lora`
-
-- `vae → VAE`
-
-Users can adjust freely.
-
----
-
-🚀 Usage scenario
-
-- Production environment
-
-The stable version of ComfyUI uses the same warehouse as A1111 to reduce maintenance costs.
-
-- Development environment
-
-The new version of ComfyUI can quickly access the same warehouse, and there is no need to download the model repeatedly to test new features.
-
-- Test environment
-
-When multiple versions coexist, the model directory is consistent, which is convenient for workflow migration and compatibility verification.
-
----
-
-🔧 Technology stack
-
-- Python 3.x
-
-- Typer CLI
-
-- Pathlib file system operation
-
-- YAML configuration loading
-
----
-
-📌 Design principles
-
-- Separation of configuration and logic
-
-All paths and mappings are defined in YAML.
-
-- Modularity and scalability
-
-The current implementation only contains the minimum closed loop shared by the model, and more functions can be expanded in the future.
-
-- Cross-platform compatibility
-
-Soft link logic is compatible with Windows and Linux.
-
----
+The tests use temporary warehouses and applications. Preview and `check` are read-only on the configured live paths.

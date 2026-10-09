@@ -1,9 +1,9 @@
 repo_root: "D:/AIProj/Models/CV"
-
 a1111_root: "D:/AIProj/launcher/stable-diffusion-webui"
+link_mode: replace
 
 comfyui_versions:
-  - name: "portable"
-    path: "D:/AIProj/launcher/ComfyUI_windows_portable/ComfyUI"
-  - name: "prod"
-    path: "D:/AIProj/launcher/ComfyUI_prod/ComfyUI"
+  - name: v018
+    path: "D:/AIProj/launcher/ComfyUI_Portable/v018/ComfyUI"
+  - name: v037_cu126
+    path: "D:/AIProj/launcher/ComfyUI_Portable/v037_cu126/ComfyUI"

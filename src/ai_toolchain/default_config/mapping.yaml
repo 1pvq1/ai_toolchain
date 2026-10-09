@@ -1,0 +1,30 @@
+# Keys are paths relative to the application root; values are paths relative
+# to repo_root. Existing folders without a mapping are reported, not guessed.
+a1111:
+  models/Stable-diffusion: checkpoints
+  models/Lora: Lora
+  models/VAE: VAEs
+  models/ControlNet: ControlNet
+  embeddings: Embeddings
+  models/hypernetworks: HyperNetworks
+  models/CLIP: CLIP
+  models/ESRGAN: UpscaleModels
+  models/RealESRGAN: UpscaleModels
+  models/SwinIR: UpscaleModels
+
+comfyui:
+  models/checkpoints: checkpoints
+  models/loras: Lora
+  models/vae: VAEs
+  models/controlnet: ControlNet
+  models/clip: CLIP
+  models/clip_vision: CLIP_Vision
+  models/diffusion_models: DiffusionModels
+  models/text_encoders: TextEncoders
+  models/embeddings: Embeddings
+  models/upscale_models: UpscaleModels
+  models/hypernetworks: HyperNetworks
+  models/photomaker: Photomaker
+  models/style_models: StyleModels
+  models/unet: UNet
+  models/onnx: ONNX
