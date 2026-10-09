@@ -1,0 +1,15 @@
+a1111:
+  Stable-diffusion: Checkpoints
+  Lora: Lora
+  VAE: VAE
+  ControlNet: ControlNet
+  embeddings: Embeddings
+  hypernetworks: HyperNetworks
+
+comfyui:
+  checkpoints: Checkpoints
+  loras: Lora
+  vae: VAE
+  controlnet: ControlNet
+  clip: CLIP
+  clip_vision: CLIP_Vision

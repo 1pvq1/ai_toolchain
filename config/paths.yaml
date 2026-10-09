@@ -1,0 +1,9 @@
+repo_root: "D:/AIProj/Models/CV"
+
+a1111_root: "D:/AIProj/launcher/stable-diffusion-webui"
+
+comfyui_versions:
+  - name: "portable"
+    path: "D:/AIProj/launcher/ComfyUI_windows_portable/ComfyUI"
+  - name: "prod"
+    path: "D:/AIProj/launcher/ComfyUI_prod/ComfyUI"
