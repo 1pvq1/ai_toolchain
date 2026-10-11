@@ -9,7 +9,8 @@ import uuid
 from platformdirs import user_state_path
 import typer
 
-from .config import ConfigError, load_config
+from .config import ConfigError, load_config, resolve_config_dir
+from .config_setup import ConfigInitializer
 from .storage.adapters.local_fs import LocalFileSystem
 from .storage.adapters.process_guard import PsutilProcessGuard
 from .storage.adapters.rich_progress import NullProgressSink, RichProgressSink
@@ -44,11 +45,25 @@ def _new_id() -> str:
 @app.callback()
 def main(
     ctx: typer.Context,
-    config_dir: Optional[Path] = typer.Option(None, "--config-dir"),
+    config_dir: Optional[Path] = typer.Option(None, "--config-dir", help="Private directory containing paths.yaml and mapping.yaml"),
     state_dir: Optional[Path] = typer.Option(None, "--state-dir"),
     no_progress: bool = typer.Option(False, "--no-progress"),
 ) -> None:
     ctx.obj = (config_dir, state_dir, no_progress)
+
+
+@app.command("init-config")
+def init_config(ctx: typer.Context) -> None:
+    """Create editable local settings from templates; existing settings are preserved."""
+    try:
+        directory = resolve_config_dir(ctx.obj[0])
+        initializer = ConfigInitializer(LocalFileSystem(), Path(__file__).parent / "default_config")
+        for path in initializer.initialize(directory):
+            typer.echo(f"Created {path}")
+        typer.echo("Fill in paths.yaml and review mapping.yaml, then run a preview command.")
+    except (ConfigError, OSError, ValueError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
 
 def _services(ctx: typer.Context):

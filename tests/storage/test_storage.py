@@ -401,7 +401,7 @@ def test_redirected_progress_is_summary(capsys):
 
 
 def test_process_guard_detects_running_comfyui(tmp_path):
-    root = tmp_path / "v018" / "ComfyUI"
+    root = tmp_path / "portable-install" / "ComfyUI"
     root.mkdir(parents=True)
     running = SimpleNamespace(info={"pid": 42, "name": "python.exe", "cwd": str(root.parent), "cmdline": ["python", "ComfyUI/main.py"]})
     guard = PsutilProcessGuard(lambda _: [running], lambda: 1)

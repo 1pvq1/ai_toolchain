@@ -180,3 +180,19 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .DS_Store
+
+# Machine-specific configuration and recovery records
+/config/local/
+/config/paths.yaml
+/config/mapping.yaml
+/config/*.local.yaml
+**/.ai_toolchain/
+.env.*
+!.env.example
+
+# Model data belongs in an external warehouse
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx

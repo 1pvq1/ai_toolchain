@@ -1,5 +1,7 @@
-# Keys are paths relative to the application root; values are paths relative
-# to repo_root. Existing folders without a mapping are reported, not guessed.
+# Copy this file to mapping.yaml in your private configuration directory.
+# Keys are relative to an application root; values are relative to warehouse_root.
+# Category names are examples: adjust values to your existing warehouse folders.
+# Unmapped folders and missing targets are reported; destinations are not guessed.
 a1111:
   models/Stable-diffusion: checkpoints
   models/Lora: Lora

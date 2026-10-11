@@ -1,0 +1,10 @@
+include README.md
+include config/*.example.yaml
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include src/ai_toolchain/default_config *.example.yaml
+prune config/local
+prune .ai_toolchain
+exclude config/paths.yaml
+exclude config/mapping.yaml
+global-exclude *.local.yaml *.log *.tmp .DS_Store

@@ -36,8 +36,12 @@ def select_targets(config: Config, app: str = "all", version: str | None = None)
         raise ConfigError("--version applies only to ComfyUI")
     if version and version not in config.comfyui_versions:
         raise ConfigError(f"Unknown ComfyUI version: {version}")
+    if app == "a1111" and config.a1111_root is None:
+        raise ConfigError("A1111 is not configured; set a1111_root in your local paths.yaml")
+    if app == "comfyui" and not config.comfyui_versions:
+        raise ConfigError("ComfyUI is not configured; add an install to comfyui_versions in your local paths.yaml")
     roots: list[tuple[str, str | None, Path]] = []
-    if app in {"a1111", "all"}:
+    if app in {"a1111", "all"} and config.a1111_root is not None:
         roots.append(("a1111", None, config.a1111_root))
     if app in {"comfyui", "all"}:
         roots.extend(("comfyui", name, root) for name, root in config.comfyui_versions.items() if not version or name == version)

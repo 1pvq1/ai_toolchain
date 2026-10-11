@@ -1,0 +1,20 @@
+# Copy this file to paths.yaml in a private configuration directory, then edit it.
+# These placeholders are deliberately unusable until you fill them in.
+# Use absolute paths. Forward slashes also work on Windows: E:/ModelWarehouse.
+warehouse_root: "<absolute path to your model warehouse>"
+
+# The A1111 root contains launch.py and models/. Set to null if you do not use it.
+a1111_root: "<absolute path to stable-diffusion-webui>"
+
+# Commands preview changes unless --apply is supplied.
+link_mode: replace
+
+# Each path points to the ComfyUI folder containing main.py and models/.
+# For a portable install, use its inner ComfyUI folder, not the launcher folder.
+# Names are your own labels for --version; they do not need to match a release.
+# Set comfyui_versions to [] if you only use A1111.
+comfyui_versions:
+  - name: primary
+    path: "<absolute path to ComfyUI>"
+  # - name: secondary
+  #   path: "<absolute path to another ComfyUI install>"

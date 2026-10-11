@@ -1,70 +1,122 @@
 # ai_toolchain
 
-A Python CLI for sharing one model warehouse across Stable Diffusion WebUI (A1111) and multiple ComfyUI installations. It can either replace each app's model folder with a directory symlink or keep the folder and add a nested `WLink`. The default is whole-folder replacement. Every command previews its work until `--apply` is supplied.
+A Python CLI for sharing one model warehouse across Stable Diffusion WebUI (A1111) and multiple ComfyUI installations. Replace application model folders with directory symlinks, or preserve local files and add a nested `WLink`.
 
-## Layout
+Model operations preview their work unless `--apply` is supplied. `init-config` creates editable configuration files. Model data, machine paths, and recovery records belong in private local storage.
 
-```text
-config/                            Machine paths and explicit model mappings
-src/ai_toolchain/cli.py             CLI and dependency composition root
-src/ai_toolchain/config.py          YAML validation
-src/ai_toolchain/targets.py         Application mapping selection
-src/ai_toolchain/storage/           Plans, migration, consolidation, recovery, and ports
-src/ai_toolchain/storage/adapters/  Local filesystem, SHA-256, journals, process guard, progress
-tests/storage/                      Temporary-directory storage integration tests
-pyproject.toml                     Package and ai-toolchain entry point
-```
+## Requirements
 
-Model files and recovery state stay outside this repository. `config/paths.yaml` names the warehouse, A1111 root, and ComfyUI versions. `config/mapping.yaml` maps paths relative to an application root to paths relative to the warehouse. Unmapped application folders are reported; the CLI does not infer a destination. A missing app folder or warehouse directory is reported and skipped.
+- Python 3.11 or newer.
+- Existing application installations and warehouse category folders.
+- Whole-folder migration and consolidation require applications, warehouse models, and recovery state on the same filesystem volume.
+- On Windows, directory symlink creation needs Developer Mode or the appropriate account privilege.
 
-The checked-in paths match this machine: `D:/AIProj/Models/CV`, `D:/AIProj/launcher/stable-diffusion-webui`, and `D:/AIProj/launcher/ComfyUI_Portable/{v018,v037_cu126}/ComfyUI`. Use `--config-dir` with another pair of YAML files for a different installation.
+Windows is the primary development platform. The configuration also accepts absolute POSIX paths; verify filesystem and symlink support on your own platform before applying changes.
 
-## Setup in aienv3
+## Quick start
+
+From a source checkout:
 
 ```powershell
-conda activate aienv3
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e .
-python -m pytest -q --basetemp=.pytest_cache/tmp
+ai-toolchain --config-dir config/local init-config
 ```
 
-The `--basetemp` argument keeps test fixtures in the repository's ignored pytest cache, which is useful when the normal Windows temporary directory is restricted.
+Edit the generated `paths.yaml` and `mapping.yaml` in `config/local/`. That directory is ignored by Git and excluded from source distributions. The templates contain placeholders, so commands refuse to use them until you enter your paths.
+
+For an installed package, `ai-toolchain init-config` uses your operating system's user configuration directory and prints its location. To keep settings elsewhere:
+
+```powershell
+ai-toolchain --config-dir "E:/PrivateSettings/ai-toolchain" init-config
+ai-toolchain --config-dir "E:/PrivateSettings/ai-toolchain" comfyui
+```
+
+The drive and folder names in documentation examples are fictional. Replace them with paths on your own system. See [configuration examples and field explanations](docs/configuration.md).
+
+## Configuration
+
+The repository and package contain portable examples:
+
+```text
+config/
+  paths.example.yaml
+  mapping.example.yaml
+  local/                  # ignored private settings created on your machine
+src/ai_toolchain/
+  default_config/         # packaged copies of the examples
+  config.py               # local configuration discovery and validation
+  config_setup.py         # template initialization with injected filesystem access
+  cli.py                  # dependency composition root and commands
+  storage/                # planning, migration, consolidation, recovery, and adapters
+tests/                    # temporary installations; no personal configuration required
+```
+
+Configuration is selected in this order:
+
+1. Global `--config-dir DIRECTORY`.
+2. The `AI_TOOLCHAIN_CONFIG_DIR` environment variable.
+3. `config/local/` in a source checkout.
+4. The operating system's user configuration directory for an installed package.
+
+Each private directory contains `paths.yaml` and `mapping.yaml`. Packaged examples are never used as active settings. Absolute roots belong in `paths.yaml`; mapping keys and values are relative paths. A1111 and ComfyUI can be configured independently.
 
 ## Commands
 
+After filling in your local configuration:
+
 ```powershell
 ai-toolchain a1111                         # preview whole-folder links
-ai-toolchain comfyui --version v018         # preview one ComfyUI version
-ai-toolchain comfyui --mode nested          # preview WLink links
-ai-toolchain check all                      # read-only verification
-ai-toolchain migrations                     # list migration journals
-ai-toolchain consolidate                    # preview legacy backup consolidation
-ai-toolchain resume MIGRATION_ID            # preview resuming interrupted work
-ai-toolchain rollback MIGRATION_ID          # preview restoring folders
+ai-toolchain comfyui --version primary     # preview one user-named install
+ai-toolchain comfyui --mode nested         # preview WLink links
+ai-toolchain check all                     # read-only inventory and link checks
+ai-toolchain migrations                    # list local journals
+ai-toolchain consolidate                   # preview legacy backup consolidation
+ai-toolchain resume MIGRATION_ID           # preview resuming interrupted work
+ai-toolchain rollback MIGRATION_ID         # preview restoring original folders
 ```
 
-Add `--apply` to a mutating command to make its previewed changes. Close affected applications before applying; the CLI checks for running Python processes in the selected installs. Use `--mode replace|nested` to override `link_mode` from `paths.yaml`. Omitting `--version` handles every configured ComfyUI version. `--config-dir`, `--state-dir`, and `--no-progress` are global options and go before the command.
+Add `--apply` to a model operation to make changes. Close affected applications first; the tool checks for running processes in the selected installs. `--mode replace|nested` overrides the configured mode. Omitting `--version` selects all configured ComfyUI installs.
 
-### Whole-folder migration
+`--config-dir`, `--state-dir`, and `--no-progress` are global options and go before the command. Progress shows bytes in a terminal and concise stage summaries when redirected. Use `--no-progress` to suppress it.
 
-The tool checks all selected mappings before making changes. It rejects unexpected symlinks and destination collisions with different content. If a relative filename already exists in the warehouse, SHA-256 establishes whether the files are identical. The original app folder is staged under `<warehouse>/.ai_toolchain/staging`, unique files are hardlinked into their mapped warehouse category, and digest-addressed snapshot hardlinks are created under `.ai_toolchain/objects`. After verification, the application folder becomes a directory symlink. No permanent backup directory remains beside the app. The versioned manifest records files, old `WLink` targets, and empty folders.
+Missing folders and unmapped application directories are reported. The tool does not guess destinations or create a missing application installation. `check` returns 0 when every selected mapping is linked, 1 for missing or pending mappings, and 2 for configuration errors.
 
-Versioned manifests, staging, legacy journal archives, and snapshots live in hidden `<warehouse>/.ai_toolchain` by default. `--state-dir PATH` selects another state location on the same volume. If an operation is interrupted, use `ai-toolchain migrations` and `ai-toolchain resume ID --apply`. A completed migration can be rolled back: after checking snapshot and warehouse hashes and available space, files are **copied** back to reconstruct the original app folder. Warehouse models and snapshot hardlinks remain available. An in-place edit of a hardlinked model also edits its snapshot; digest checks refuse rollback in that case.
+## Storage and recovery
 
-Switching a whole-folder link to `--mode nested --apply` reconstructs all folders in its migration from snapshots, then creates or repairs `WLink` inside them. A real folder or unrelated link at that name is a conflict. A mode switch may require substantial free space because local files are copied back.
+Whole-folder migration preflights selected mappings, checks collisions using SHA-256, stages original folders inside the warehouse, and creates digest-addressed hardlink snapshots. Verified files are published into their mapped categories without overwriting warehouse files. The original application folders become directory symlinks; no permanent adjacent backup folders remain.
 
-### Legacy consolidation
+By default, state lives under `<warehouse>/.ai_toolchain/`:
 
-`ai-toolchain consolidate` previews applied ComfyUI journals from the prior release. Use `--migration ID` to select one. It verifies every active link, recorded warehouse file, duplicate backup file, and unknown backup entry before writing. `--apply` creates and verifies snapshot hardlinks, moves adjacent backups into warehouse staging, removes verified redundant files, commits new manifests, and archives old journals. Existing application links stay in place. The two October 2026 ComfyUI migrations were consolidated; their adjacent backups held 10,774,052,856 redundant bytes.
+```text
+journals/    Versioned manifests and operation phases
+objects/     Digest-addressed hardlink snapshots
+staging/     Temporary migration and rollback folders
+legacy/      Archived journals from the earlier backup format
+```
 
-On Windows, creating directory symlinks requires an account or Developer Mode with the necessary privilege. If creation fails, the journal retains the stage for `resume`. Hardlink snapshots require the state and warehouse models to be on the same volume.
+The state directory receives the Windows Hidden attribute when supported. `--state-dir DIRECTORY` overrides its location and must keep state on the same volume.
 
-## Development checks
+Interrupted operations can be resumed by journal ID. Rollback verifies recorded hashes and free space, then **copies** snapshot files back and reconstructs recorded links and directories. Warehouse models and snapshots are retained. Hardlinks share an inode: an in-place model edit also changes its snapshot, and digest checks then block rollback.
 
-Run tests and lint with the `aienv3` interpreter:
+`consolidate` converts applied legacy ComfyUI journals and adjacent backup folders into warehouse state. It verifies active links, recorded files, hashes, and backup inventory before cleanup. Use `--migration ID` to select one journal. Application links stay in place.
+
+## Development
+
+Tests create temporary warehouses and applications. They do not depend on a developer's local configuration or model collection.
 
 ```powershell
+python -m pip install -e ".[dev]"
 python -m pytest -q --basetemp=.pytest_cache/tmp
 python -m ruff check src tests
+python -m build --wheel --sdist
 ```
 
-The tests use temporary warehouses and applications. Preview and `check` are read-only on the configured live paths.
+An existing Conda environment also works; activate your chosen environment before running these commands.
+
+## Preparing a public repository
+
+Keep real configuration in `config/local/` or outside the checkout. Recovery journals and CLI output contain absolute paths and model inventory details; replace them with synthetic examples before sharing them in issues.
+
+[The publication guide](docs/publishing.md) covers reviewing staged files, checking release archives, and publishing a clean source history. Removing a path from the current files does not remove it from earlier Git commits.

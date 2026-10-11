@@ -6,8 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "ai-toolchain"
 version = "0.1.0"
 description = "Share a model warehouse across A1111 and ComfyUI installations"
-requires-python = ">=3.10"
+readme = "README.md"
+requires-python = ">=3.11"
 dependencies = ["typer>=0.16,<1", "PyYAML>=6,<7", "platformdirs>=4,<5", "rich>=14,<15", "psutil>=7,<8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1", "build>=1,<2"]
 
 [project.scripts]
 ai-toolchain = "ai_toolchain.cli:app"
@@ -16,7 +20,7 @@ ai-toolchain = "ai_toolchain.cli:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ai_toolchain = ["default_config/*.yaml"]
+ai_toolchain = ["default_config/*.example.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
